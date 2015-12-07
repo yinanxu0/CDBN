@@ -103,5 +103,5 @@ def predict():
     print "Predicted accuracy for the test set: %.2f%%" % (test_score*100.)
 
 if __name__ == '__main__':
-    # sgd_optimization()
+    sgd_optimization()
     # predict()
