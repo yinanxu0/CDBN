@@ -1,10 +1,11 @@
-
+#############################################################
+#            Created by Yinan Xu, 11/19/2015                #
+#            Copyright @ Yinan Xu                           #
+#############################################################
 
 import timeit
-
 import Image
 import numpy
-
 import os
 import theano
 import theano.tensor as T
@@ -21,7 +22,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
              n_hidden=500):
 
     
-    datasets = LF.load_cifar()
+    datasets = LF.load_cifar(SIZE_TRAIN=1)
 
     train_set_x, train_set_y = datasets[0]
     test_set_x, test_set_y = datasets[1]
@@ -57,7 +58,6 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         os.makedirs(output_folder)
     os.chdir(output_folder)
 
-    # start-snippet-5
     # it is ok for a theano function to have no output
     # the purpose of train_rbm is solely to update the RBM parameters
     train_rbm = theano.function(
@@ -77,9 +77,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
     for epoch in xrange(training_epochs):
 
         # go through the training set
-        mean_cost = []
-        for batch_index in xrange(n_train_batches):
-            mean_cost += [train_rbm(batch_index)]
+        mean_cost += [train_rbm(i) for i in xrange(n_train_batches)]
 
         print 'Training epoch %d, cost is ' % epoch, numpy.mean(mean_cost)
 
@@ -118,7 +116,6 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
             dtype=theano.config.floatX
         )
     )
-    # end-snippet-6 start-snippet-7
     plot_every = 1000
     # define one step of Gibbs sampling (mf = mean-field) define a
     # function that does `plot_every` steps before returning the
@@ -154,6 +151,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
 
     # create a space to store the image for plotting ( we need to leave
     # room for the tile_spacing as well)
+    # n_samples=10, n_chains=20
     image_data = numpy.zeros(
         (33 * n_samples + 1, 33 * n_chains - 1),
         dtype='uint8'
@@ -163,7 +161,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         # because successive samples in the chain are too correlated
         vis_mf, vis_sample = sample_fn()
         print ' ... plotting sample ', idx
-        image_data[33 * idx:33 * idx + 32, :] = tile_raster_images(
+        image_data[33*idx: 33*idx+32, :] = tile_raster_images(
             X=vis_mf,
             img_shape=(32, 32),
             tile_shape=(1, n_chains),
@@ -173,7 +171,6 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
     # construct image
     image = Image.fromarray(image_data)
     image.save('samples.png')
-    # end-snippet-7
     os.chdir('../')
 
 if __name__ == '__main__':

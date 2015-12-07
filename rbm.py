@@ -5,20 +5,12 @@ to those without visible-visible and hidden-hidden connections.
 """
 import timeit
 import Image
-
-# try:
-#     import PIL.Image as Image
-# except ImportError:
-#     import Image
-
 import numpy
-
 import os
 import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 from utils import tile_raster_images
-import load_data as LD
 
 class RBM(object):
     def __init__(self, input=None, n_visible=784, n_hidden=500, W=None,
