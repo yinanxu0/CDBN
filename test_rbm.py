@@ -77,7 +77,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
     for epoch in xrange(training_epochs):
 
         # go through the training set
-        mean_cost += [train_rbm(i) for i in xrange(n_train_batches)]
+        mean_cost = [train_rbm(i) for i in xrange(n_train_batches)]
 
         print 'Training epoch %d, cost is ' % epoch, numpy.mean(mean_cost)
 
