@@ -25,7 +25,7 @@ def unpickle(file):
     fo.close()
     return dict
 
-def load_cifar():
+def load_cifar(SIZE_TRAIN = 5):
 
     print '... load data'
     path_name = '../cifar-10-batches-py/'
@@ -34,7 +34,7 @@ def load_cifar():
     batch_name_base = 'data_batch_'
     train_data = []
     train_label = []
-    for i in range(5):
+    for i in range(SIZE_TRAIN):
         batch_name = path_name+batch_name_base+str(i+1)
         batch_data = unpickle(batch_name)
         train_data.extend(batch_data['data'])
@@ -50,5 +50,4 @@ def load_cifar():
     x_train, y_train = splitDataset(train_data, train_label)
     x_test, y_test = splitDataset(test_data, test_label)
 
-    rval = [(x_train, y_train), (x_test, y_test)]
-    return rval
+    return [(x_train, y_train), (x_test, y_test)]
