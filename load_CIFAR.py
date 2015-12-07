@@ -28,7 +28,7 @@ def unpickle(file):
 def load_cifar():
 
     print '... load data'
-    path_name = 'cifar-10-batches-py/'
+    path_name = '../cifar-10-batches-py/'
 
     # load train data
     batch_name_base = 'data_batch_'
