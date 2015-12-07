@@ -11,7 +11,7 @@ import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 
 from utils import tile_raster_images
-import load_data as LD
+import load_CIFAR as LF
 from rbm import RBM
 
 
@@ -19,24 +19,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
              batch_size=20,
              n_chains=20, n_samples=10, output_folder='rbm_plots',
              n_hidden=500):
-    """
-    Demonstrate how to train and afterwards sample from it using Theano.
 
-    This is demonstrated on MNIST.
-
-    :param learning_rate: learning rate used for training the RBM
-
-    :param training_epochs: number of epochs used for training
-
-    :param dataset: path the the pickled dataset
-
-    :param batch_size: size of a batch used to train the RBM
-
-    :param n_chains: number of parallel Gibbs chains to be used for sampling
-
-    :param n_samples: number of samples to plot for each chain
-
-    """
     
     datasets = LF.load_cifar()
 
