@@ -24,14 +24,11 @@ __docformat__ = 'restructedtext en'
 import os
 import sys
 import timeit
-
 import numpy
-
 import theano
 import theano.tensor as T
-
 from logistic_sgd import LogisticRegression
-import load_data as LD
+import load_CIFAR as LF
 
 
 class HiddenLayer(object):
@@ -222,16 +219,20 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
 
 
    """
-    datasets = LD.load_data(dataset)
 
-    train_set_x, train_set_y = datasets[0]
-    valid_set_x, valid_set_y = datasets[1]
-    test_set_x, test_set_y = datasets[2]
+    datasets = LF.load_cifar()
+
+    x, y = datasets[0]
+    train_set_x = x[:40000]
+    train_set_y = y[:40000]
+    valid_set_x = x[40000:]
+    valid_set_y = y[40000:]
+    test_set_x, test_set_y = datasets[1]
 
     # compute number of minibatches for training, validation and testing
-    n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
-    n_valid_batches = valid_set_x.get_value(borrow=True).shape[0] / batch_size
-    n_test_batches = test_set_x.get_value(borrow=True).shape[0] / batch_size
+    n_train_batches = train_set_x.shape[0] / batch_size
+    n_valid_batches = valid_set_x.shape[0] / batch_size
+    n_test_batches = test_set_x.shape[0] / batch_size
 
     ######################
     # BUILD ACTUAL MODEL #
