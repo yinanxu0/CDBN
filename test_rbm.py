@@ -9,33 +9,26 @@ import numpy
 import os
 import theano
 import theano.tensor as T
-from theano.tensor.shared_randomstreams import RandomStreams
-
 from utils import tile_raster_images
 import load_CIFAR as LF
 from rbm import RBM
 
 
-def test_rbm(learning_rate=0.1, training_epochs=15,
-             batch_size=20,
+def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
              n_chains=20, n_samples=10, output_folder='rbm_plots',
              n_hidden=500):
 
-    
-    datasets = LF.load_cifar(SIZE_TRAIN=1)
+    datasets = LF.load_cifar(SIZE_TRAIN=5,DEBUG=0)
 
     train_set_x, train_set_y = datasets[0]
     test_set_x, test_set_y = datasets[1]
 
-    # compute number of minibatches for training, validation and testing
-    n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
+    n_train_batches = train_set_x.get_value().shape[0]/batch_size
 
-    # allocate symbolic variables for the data
     index = T.lscalar()    # index to a [mini]batch
     x = T.matrix('x')  # the data is presented as rasterized images
 
     rng = numpy.random.RandomState(123)
-    theano_rng = RandomStreams(rng.randint(2 ** 30))
 
     # initialize storage for the persistent chain (state = hidden
     # layer of chain)
@@ -43,9 +36,9 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
                                                  dtype=theano.config.floatX),
                                      borrow=True)
 
-    # construct the RBM class
     rbm = RBM(input=x, n_visible=1024,
-              n_hidden=n_hidden, numpy_rng=rng, theano_rng=theano_rng)
+              n_hidden=n_hidden, numpy_rng=rng)
+
 
     # get the cost and the gradient corresponding to one step of CD-15
     cost, updates = rbm.get_cost_updates(lr=learning_rate,
@@ -58,16 +51,13 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         os.makedirs(output_folder)
     os.chdir(output_folder)
 
-    # it is ok for a theano function to have no output
-    # the purpose of train_rbm is solely to update the RBM parameters
     train_rbm = theano.function(
-        [index],
-        cost,
+        inputs=[index],
+        outputs=cost,
         updates=updates,
         givens={
             x: train_set_x[index * batch_size: (index + 1) * batch_size]
-        },
-        name='train_rbm'
+        }
     )
 
     plotting_time = 0.
@@ -79,7 +69,7 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         # go through the training set
         mean_cost = [train_rbm(i) for i in xrange(n_train_batches)]
 
-        print 'Training epoch %d, cost is ' % epoch, numpy.mean(mean_cost)
+        print 'Training epoch %d, cost is %.2f.' % (epoch, numpy.mean(mean_cost))
 
         # Plot filters after each training epoch
         plotting_start = timeit.default_timer()
