@@ -171,8 +171,10 @@ class DBN(object):
         (test_set_x, test_set_y) = datasets[2]
 
         # compute number of minibatches for training, validation and testing
-        n_valid_batches = valid_set_x.shape[0]/batch_size
-        n_test_batches = test_set_x.shape[0]/batch_size
+        # n_valid_batches = valid_set_x.shape[0].eval()/batch_size
+        # n_test_batches = test_set_x.shape[0].eval()/batch_size
+        # print n_valid_batches
+        # print n_test_batches
 
         index = T.lscalar('index')  # index to a [mini]batch
 
@@ -194,7 +196,7 @@ class DBN(object):
             }
         )
 
-        test_score_i = theano.function(
+        test_fn = theano.function(
             [index],
             self.errors,
             givens={
@@ -203,7 +205,7 @@ class DBN(object):
             }
         )
 
-        valid_score_i = theano.function(
+        valid_fn = theano.function(
             [index],
             self.errors,
             givens={
@@ -212,9 +214,5 @@ class DBN(object):
             }
         )
 
-        # scan the entire validation and test set
-        valid_score = [valid_score_i(i) for i in xrange(n_valid_batches)]
-        test_score = [test_score_i(i) for i in xrange(n_test_batches)]
-
-        return train_fn, valid_score, test_score
+        return train_fn, valid_fn, test_fn
 

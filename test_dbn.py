@@ -1,4 +1,5 @@
 
+import cPickle
 import os
 import sys
 import timeit
@@ -13,8 +14,6 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
             batch_size=10):
     """
     Demonstrates how to train and test a Deep Belief Network.
-
-    This is demonstrated on MNIST.
 
     :type finetune_lr: float
     :param finetune_lr: learning rate used in the finetune stage
@@ -32,11 +31,13 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
     datasets = LF.load_cifar()
 
+    N1 = 1000
+    N2 = 1500
     x, y = datasets[0]
-    train_set_x = x[:40000]
-    train_set_y = y[:40000]
-    valid_set_x = x[40000:]
-    valid_set_y = y[40000:]
+    train_set_x = x[:N1]
+    train_set_y = y[:N1]
+    valid_set_x = x[N1:N2]
+    valid_set_y = y[N1:N2]
     test_set_x, test_set_y = datasets[1]
     datasets = [(train_set_x, train_set_y),
                 (valid_set_x, valid_set_y),
@@ -44,7 +45,8 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
     # compute number of minibatches for training, validation and testing
     n_train_batches = train_set_x.shape[0].eval()/batch_size
-    # print n_train_batches.eval()
+    n_valid_batches = valid_set_x.shape[0].eval()/batch_size
+    n_test_batches = test_set_x.shape[0].eval()/batch_size
 
     # numpy random generator
     numpy_rng = numpy.random.RandomState(123)
@@ -73,8 +75,7 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
             for batch_index in xrange(n_train_batches):
                 c.append(pretraining_fns[i](index=batch_index,
                                             lr=pretrain_lr))
-            print 'Pre-training layer %i, epoch %d, cost ' % (i, epoch),
-            print numpy.mean(c)
+            print 'Pre-training layer %i, epoch %d, cost %.4f.' %(i+1, epoch, numpy.mean(c))
 
     end_time = timeit.default_timer()
     print >> sys.stderr, ('The pretraining code for file ' +
@@ -86,7 +87,7 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
     # get the training, validation and testing function for the model
     print '... getting the finetuning functions'
-    train_fn, validate_model, test_model = dbn.build_finetune_functions(
+    train_fn, validate_fn, test_fn = dbn.build_finetune_functions(
         datasets=datasets,
         batch_size=batch_size,
         learning_rate=finetune_lr
@@ -120,15 +121,15 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
             if (iter + 1) % validation_frequency == 0:
 
-                validation_losses = validate_model()
+                validation_losses = [validate_fn(i) for i in xrange(n_valid_batches)]
                 this_validation_loss = numpy.mean(validation_losses)
                 print(
-                    'epoch %i, minibatch %i/%i, validation error %f %%'
+                    'epoch %i, minibatch %i/%i, validation accuracy %f %%'
                     % (
                         epoch,
                         minibatch_index + 1,
                         n_train_batches,
-                        this_validation_loss * 100.
+                        (1-this_validation_loss)* 100.
                     )
                 )
 
@@ -147,12 +148,12 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
                     best_iter = iter
 
                     # test it on the test set
-                    test_losses = test_model()
+                    test_losses = [test_fn(i) for i in xrange(n_test_batches)]
                     test_score = numpy.mean(test_losses)
-                    print(('     epoch %i, minibatch %i/%i, test error of '
+                    print(('     epoch %i, minibatch %i/%i, test accuracy of '
                            'best model %f %%') %
                           (epoch, minibatch_index + 1, n_train_batches,
-                           test_score * 100.))
+                           (1-test_score) * 100.))
 
                     # save the best model
                     f = file('best_model_dbn.pkl', 'w')
