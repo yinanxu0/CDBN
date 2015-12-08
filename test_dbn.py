@@ -11,7 +11,7 @@ from DBN import DBN
 
 def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
              pretrain_lr=0.01, k=1, training_epochs=1000,
-            batch_size=10):
+            batch_size=10, DEBUG=0):
     """
     Demonstrates how to train and test a Deep Belief Network.
 
@@ -30,9 +30,12 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
     """
 
     datasets = LF.load_cifar()
-
-    N1 = 1000
-    N2 = 1500
+    if DEBUG:
+        N1 = 400
+        N2 = 600
+    else:
+        N1 = 40000
+        N2 = 50000
     x, y = datasets[0]
     train_set_x = x[:N1]
     train_set_y = y[:N1]
@@ -170,7 +173,7 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
             'Optimization complete with best validation score of %f %%, '
             'obtained at iteration %i, '
             'with test performance %f %%'
-        ) % (best_validation_loss * 100., best_iter + 1, test_score * 100.)
+        ) % ((1-best_validation_loss)*100., best_iter+1, (1-test_score)*100.)
     )
     print >> sys.stderr, ('The fine tuning code for file ' +
                           os.path.split(__file__)[1] +
@@ -179,4 +182,4 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
 
 if __name__ == '__main__':
-    test_DBN()
+    test_DBN(DEBUG=1)
