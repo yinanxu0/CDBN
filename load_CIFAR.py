@@ -13,7 +13,7 @@ SIZE = 1024
 
 def splitDataset(dataX, dataY):
     dataX = numpy.transpose(numpy.asarray(dataX, dtype=theano.config.floatX))
-    dataX_gray = 0.21*dataX[0:SIZE]+0.72*dataX[SIZE:2*SIZE]+0.07*dataX[2*SIZE:3*SIZE]
+    dataX_gray = (0.21*dataX[0:SIZE]+0.72*dataX[SIZE:2*SIZE]+0.07*dataX[2*SIZE:3*SIZE])/255
     shared_x = theano.shared(numpy.transpose(dataX_gray), borrow=True)
     shared_y = theano.shared(numpy.asarray(dataY, dtype=theano.config.floatX), borrow=True)
     return shared_x, T.cast(shared_y, 'int32')
@@ -25,7 +25,7 @@ def unpickle(file):
     fo.close()
     return dict
 
-def load_cifar(SIZE_TRAIN = 5):
+def load_cifar(SIZE_TRAIN = 5, DEBUG=0):
 
     print '... load data'
     path_name = '../cifar-10-batches-py/'
@@ -47,6 +47,12 @@ def load_cifar(SIZE_TRAIN = 5):
     test_label = test_batch['labels']
 
     # split data
+
+    # for debug
+    if DEBUG:
+        train_data = train_data[:400]
+        train_label = train_label[:400]
+
     x_train, y_train = splitDataset(train_data, train_label)
     x_test, y_test = splitDataset(test_data, test_label)
 
