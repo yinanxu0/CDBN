@@ -13,12 +13,24 @@ from utils import tile_raster_images
 import load_CIFAR as LF
 from rbm import RBM
 
+IMAGE_SIZE = 32
+IMAGE_SIZE_PLUS = IMAGE_SIZE+1
+DEBUG_SET = 0
+from load_data import load_data
 
-def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
+def test_rbm(learning_rate=0.1, training_epochs=10, batch_size=20,
              n_chains=20, n_samples=10, output_folder='rbm_plots',
              n_hidden=500):
 
-    datasets = LF.load_cifar(SIZE_TRAIN=5,DEBUG=0)
+    # datasets = load_data()
+    # IMAGE_SIZE = 28
+    # IMAGE_SIZE_PLUS = IMAGE_SIZE+1
+
+    if DEBUG_SET:
+        SIZE_TRAIN_SET=1
+    else:
+        SIZE_TRAIN_SET=5
+    datasets = LF.load_cifar(SIZE_TRAIN=SIZE_TRAIN_SET,DEBUG=DEBUG_SET)
 
     train_set_x, train_set_y = datasets[0]
     test_set_x, test_set_y = datasets[1]
@@ -28,21 +40,10 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
     index = T.lscalar()    # index to a [mini]batch
     x = T.matrix('x')  # the data is presented as rasterized images
 
-    rng = numpy.random.RandomState(123)
-
-    # initialize storage for the persistent chain (state = hidden
-    # layer of chain)
-    persistent_chain = theano.shared(numpy.zeros((batch_size, n_hidden),
-                                                 dtype=theano.config.floatX),
-                                     borrow=True)
-
-    rbm = RBM(input=x, n_visible=1024,
-              n_hidden=n_hidden, numpy_rng=rng)
-
+    rbm = RBM(input=x, n_visible=IMAGE_SIZE*IMAGE_SIZE, n_hidden=n_hidden)
 
     # get the cost and the gradient corresponding to one step of CD-15
-    cost, updates = rbm.get_cost_updates(lr=learning_rate,
-                                         persistent=persistent_chain, k=15)
+    cost, updates = rbm.cost_updates(lr=learning_rate, k=15)
 
     #################################
     #     Training the RBM          #
@@ -69,7 +70,7 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
         # go through the training set
         mean_cost = [train_rbm(i) for i in xrange(n_train_batches)]
 
-        print 'Training epoch %d, cost is %.2f.' % (epoch, numpy.mean(mean_cost))
+        print 'Training epoch %d, cost is %.2f.' % (epoch+1, numpy.mean(mean_cost))
 
         # Plot filters after each training epoch
         plotting_start = timeit.default_timer()
@@ -77,7 +78,7 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
         image = Image.fromarray(
             tile_raster_images(
                 X=rbm.W.get_value(borrow=True).T,
-                img_shape=(32, 32),
+                img_shape=(IMAGE_SIZE, IMAGE_SIZE),
                 tile_shape=(10, 10),
                 tile_spacing=(1, 1)
             )
@@ -90,7 +91,7 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
 
     pretraining_time = (end_time - start_time) - plotting_time
 
-    print ('Training took %f minutes' % (pretraining_time / 60.))
+    print ('Training took %f minutes' % (pretraining_time/60.))
 
     #################################
     #     Sampling from the RBM     #
@@ -99,8 +100,8 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
     number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
 
     # pick random test examples, with which to initialize the persistent chain
-    test_idx = rng.randint(number_of_test_samples - n_chains)
-    persistent_vis_chain = theano.shared(
+    test_idx = numpy.random.randint(number_of_test_samples - n_chains)
+    vis_chain = theano.shared(
         numpy.asarray(
             test_set_x.get_value(borrow=True)[test_idx:test_idx + n_chains],
             dtype=theano.config.floatX
@@ -110,31 +111,21 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
     # define one step of Gibbs sampling (mf = mean-field) define a
     # function that does `plot_every` steps before returning the
     # sample for plotting
-    (
-        [
-            presig_hids,
-            hid_mfs,
-            hid_samples,
-            presig_vis,
-            vis_mfs,
-            vis_samples
-        ],
-        updates
-    ) = theano.scan(
+    ([_, _, _, _, vis_expects, vis_samples], updates) = theano.scan(
         rbm.gibbs_vhv,
-        outputs_info=[None, None, None, None, None, persistent_vis_chain],
+        outputs_info=[None, None, None, None, None, vis_chain],
         n_steps=plot_every
     )
 
     # add to updates the shared variable that takes care of our persistent
     # chain :.
-    updates.update({persistent_vis_chain: vis_samples[-1]})
+    updates.update({vis_chain: vis_samples[-1]})
     # construct the function that implements our persistent chain.
     # we generate the "mean field" activations for plotting and the actual
     # samples for reinitializing the state of our persistent chain
     sample_fn = theano.function(
         [],
-        [vis_mfs[-1], vis_samples[-1]],
+        [vis_expects[-1], vis_samples[-1]],
         updates=updates,
         name='sample_fn'
     )
@@ -143,7 +134,7 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
     # room for the tile_spacing as well)
     # n_samples=10, n_chains=20
     image_data = numpy.zeros(
-        (33 * n_samples + 1, 33 * n_chains - 1),
+        (IMAGE_SIZE_PLUS*n_samples+1, IMAGE_SIZE_PLUS*n_chains - 1),
         dtype='uint8'
     )
     for idx in xrange(n_samples):
@@ -151,9 +142,9 @@ def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
         # because successive samples in the chain are too correlated
         vis_mf, vis_sample = sample_fn()
         print ' ... plotting sample ', idx
-        image_data[33*idx: 33*idx+32, :] = tile_raster_images(
+        image_data[IMAGE_SIZE_PLUS*idx: IMAGE_SIZE_PLUS*idx+IMAGE_SIZE, :] = tile_raster_images(
             X=vis_mf,
-            img_shape=(32, 32),
+            img_shape=(IMAGE_SIZE, IMAGE_SIZE),
             tile_shape=(1, n_chains),
             tile_spacing=(1, 1)
         )
