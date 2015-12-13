@@ -8,11 +8,11 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams
 from logistic_sgd import LogisticRegression
 from mlp import HiddenLayer
 from rbm import RBM
+import numpy.random as numpy_rng
 
 class DBN(object):
 
-    def __init__(self, numpy_rng, theano_rng=None, n_ins=784,
-                 hidden_layers_sizes=[500, 500], n_outs=10):
+    def __init__(self, n_ins=1024, hidden_layers_sizes=[500, 500], n_outs=10):
 
         self.sigmoid_layers = []
         self.rbm_layers = []
@@ -21,42 +21,19 @@ class DBN(object):
 
         assert self.n_layers > 0
 
-        if not theano_rng:
-            theano_rng = MRG_RandomStreams(numpy_rng.randint(2 ** 30))
-
         # allocate symbolic variables for the data
         self.x = T.matrix('x')  # the data is presented as rasterized images
         self.y = T.ivector('y')  # the labels are presented as 1D vector
                                  # of [int] labels
 
-        # The DBN is an MLP, for which all weights of intermediate
-        # layers are shared with a different RBM.  We will first
-        # construct the DBN as a deep multilayer perceptron, and when
-        # constructing each sigmoidal layer we also construct an RBM
-        # that shares weights with that layer. During pretraining we
-        # will train these RBMs (which will lead to chainging the
-        # weights of the MLP as well) During finetuning we will finish
-        # training the DBN by doing stochastic gradient descent on the
-        # MLP.
-
         for i in xrange(self.n_layers):
             # construct the sigmoidal layer
-
-            # the size of the input is either the number of hidden
-            # units of the layer below or the input size if we are on
-            # the first layer
             if i == 0:
                 input_size = n_ins
-            else:
-                input_size = hidden_layers_sizes[i - 1]
-
-            # the input to this layer is either the activation of the
-            # hidden layer below or the input of the DBN if you are on
-            # the first layer
-            if i == 0:
                 layer_input = self.x
             else:
-                layer_input = self.sigmoid_layers[-1].output
+                input_size = hidden_layers_sizes[i - 1]
+                layer_input = self.sigmoid_layers[-1].output                
 
             sigmoid_layer = HiddenLayer(rng=numpy_rng,
                                         input=layer_input,
@@ -64,20 +41,11 @@ class DBN(object):
                                         n_out=hidden_layers_sizes[i],
                                         activation=T.nnet.sigmoid)
 
-            # add the layer to our list of layers
             self.sigmoid_layers.append(sigmoid_layer)
-
-            # its arguably a philosophical question...  but we are
-            # going to only declare that the parameters of the
-            # sigmoid_layers are parameters of the DBN. The visible
-            # biases in the RBM are parameters of those RBMs, but not
-            # of the DBN.
             self.params.extend(sigmoid_layer.params)
 
             # Construct an RBM that shared weights with this layer
-            rbm_layer = RBM(numpy_rng=numpy_rng,
-                            theano_rng=theano_rng,
-                            input=layer_input,
+            rbm_layer = RBM(input=layer_input,
                             n_visible=input_size,
                             n_hidden=hidden_layers_sizes[i],
                             W=sigmoid_layer.W,
@@ -121,28 +89,19 @@ class DBN(object):
 
         # number of batches
         n_batches = train_set_x.shape[0] / batch_size
-        # begining of a batch, given `index`
-        batch_begin = index * batch_size
-        # ending of a batch given `index`
-        batch_end = batch_begin + batch_size
 
         pretrain_fns = []
         for rbm in self.rbm_layers:
-
-            # get the cost and the updates list
-            # using CD-k here (persisent=None) for training each RBM.
-            # TODO: change cost function to reconstruction error
-            cost, updates = rbm.get_cost_updates(learning_rate,
-                                                 persistent=None, k=k)
+            # change cost function to reconstruction error
+            cost, updates = rbm.cost_updates(learning_rate,k=k)
 
             # compile the theano function
             fn = theano.function(
-                inputs=[index, theano.Param(learning_rate, default=0.1)],
+                inputs=[index, theano.Param(learning_rate, default=0.01)],
                 outputs=cost,
                 updates=updates,
-                givens={self.x: train_set_x[batch_begin:batch_end]}
+                givens={self.x: train_set_x[index*batch_size: (index+1)*batch_size]}
             )
-            # append `fn` to the list of functions
             pretrain_fns.append(fn)
 
         return pretrain_fns
@@ -171,10 +130,8 @@ class DBN(object):
         (test_set_x, test_set_y) = datasets[2]
 
         # compute number of minibatches for training, validation and testing
-        # n_valid_batches = valid_set_x.shape[0].eval()/batch_size
-        # n_test_batches = test_set_x.shape[0].eval()/batch_size
-        # print n_valid_batches
-        # print n_test_batches
+        n_valid_batches = valid_set_x.shape[0]/batch_size
+        n_test_batches = test_set_x.shape[0]/batch_size
 
         index = T.lscalar('index')  # index to a [mini]batch
 
@@ -184,7 +141,7 @@ class DBN(object):
         # compute list of fine-tuning updates
         updates = []
         for param, gparam in zip(self.params, gparams):
-            updates.append((param, param - gparam * learning_rate))
+            updates.append((param, param - gparam*learning_rate))
 
         train_fn = theano.function(
             inputs=[index],
@@ -197,8 +154,8 @@ class DBN(object):
         )
 
         test_fn = theano.function(
-            [index],
-            self.errors,
+            inputs=[index],
+            outputs=self.errors,
             givens={
                 self.x: test_set_x[index*batch_size: (index+1)*batch_size],
                 self.y: test_set_y[index*batch_size: (index+1)*batch_size]
@@ -206,8 +163,8 @@ class DBN(object):
         )
 
         valid_fn = theano.function(
-            [index],
-            self.errors,
+            inputs=[index],
+            outputs=self.errors,
             givens={
                 self.x: valid_set_x[index*batch_size: (index+1)*batch_size],
                 self.y: valid_set_y[index*batch_size: (index+1)*batch_size]

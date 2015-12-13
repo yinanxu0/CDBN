@@ -1,4 +1,5 @@
 
+
 import cPickle
 import os
 import sys
@@ -9,27 +10,13 @@ import theano.tensor as T
 import load_CIFAR as LF
 from DBN import DBN
 
-def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
-             pretrain_lr=0.01, k=1, training_epochs=1000,
-            batch_size=10, DEBUG=0):
-    """
-    Demonstrates how to train and test a Deep Belief Network.
+degub_setting = 1
 
-    :type finetune_lr: float
-    :param finetune_lr: learning rate used in the finetune stage
-    :type pretraining_epochs: int
-    :param pretraining_epochs: number of epoch to do pretraining
-    :type pretrain_lr: float
-    :param pretrain_lr: learning rate to be used during pre-training
-    :type k: int
-    :param k: number of Gibbs steps in CD/PCD
-    :type training_epochs: int
-    :param training_epochs: maximal number of iterations ot run the optimizer
-    :type batch_size: int
-    :param batch_size: the size of a minibatch
-    """
+def test_DBN(finetune_lr=0.05, pretraining_epochs=20, pretrain_lr=0.01,
+            k=1, training_epochs=1000, batch_size=10,DEBUG=0):
 
     datasets = LF.load_cifar()
+
     if DEBUG:
         N1 = 400
         N2 = 600
@@ -51,12 +38,9 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
     n_valid_batches = valid_set_x.shape[0].eval()/batch_size
     n_test_batches = test_set_x.shape[0].eval()/batch_size
 
-    # numpy random generator
-    numpy_rng = numpy.random.RandomState(123)
     print '... building the model'
     # construct the Deep Belief Network
-    dbn = DBN(numpy_rng=numpy_rng, n_ins=1024,
-              hidden_layers_sizes=[800, 600, 400],
+    dbn = DBN(n_ins=1024, hidden_layers_sizes=[500, 500],
               n_outs=10)
 
     #########################
@@ -78,7 +62,7 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
             for batch_index in xrange(n_train_batches):
                 c.append(pretraining_fns[i](index=batch_index,
                                             lr=pretrain_lr))
-            print 'Pre-training layer %i, epoch %d, cost %.4f.' %(i+1, epoch, numpy.mean(c))
+            print 'Pre-training layer %i, epoch %d, cost %.4f' % (i+1, epoch+1, numpy.mean(c))
 
     end_time = timeit.default_timer()
     print >> sys.stderr, ('The pretraining code for file ' +
@@ -127,12 +111,12 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
                 validation_losses = [validate_fn(i) for i in xrange(n_valid_batches)]
                 this_validation_loss = numpy.mean(validation_losses)
                 print(
-                    'epoch %i, minibatch %i/%i, validation accuracy %f %%'
+                    'epoch %i, minibatch %i/%i, validation error %.2f %%'
                     % (
                         epoch,
                         minibatch_index + 1,
                         n_train_batches,
-                        (1-this_validation_loss)* 100.
+                        this_validation_loss * 100.
                     )
                 )
 
@@ -152,11 +136,11 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
                     # test it on the test set
                     test_losses = [test_fn(i) for i in xrange(n_test_batches)]
-                    test_score = numpy.mean(test_losses)
-                    print(('     epoch %i, minibatch %i/%i, test accuracy of '
-                           'best model %f %%') %
+                    test_score = 1-numpy.mean(test_losses)
+                    print(('     epoch %i, minibatch %i/%i, test error of '
+                           'best model %.2f %%') %
                           (epoch, minibatch_index + 1, n_train_batches,
-                           (1-test_score) * 100.))
+                           test_score * 100.))
 
                     # save the best model
                     f = file('best_model_dbn.pkl', 'w')
@@ -169,17 +153,14 @@ def test_DBN(finetune_lr=0.1, pretraining_epochs=100,
 
     end_time = timeit.default_timer()
     print(
-        (
-            'Optimization complete with best validation score of %f %%, '
-            'obtained at iteration %i, '
-            'with test performance %f %%'
-        ) % ((1-best_validation_loss)*100., best_iter+1, (1-test_score)*100.)
+        ('Optimization complete with best validation score of %.2f %%, '
+            'with test performance %.2f %%') 
+        %((1-best_validation_loss)*100., test_score * 100.)
     )
     print >> sys.stderr, ('The fine tuning code for file ' +
                           os.path.split(__file__)[1] +
                           ' ran for %.2fm' % ((end_time - start_time)
                                               / 60.))
 
-
 if __name__ == '__main__':
-    test_DBN(DEBUG=1)
+    test_DBN(DEBUG=degub_setting)
