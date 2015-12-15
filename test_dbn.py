@@ -9,13 +9,17 @@ import theano
 import theano.tensor as T
 import load_CIFAR as LF
 from DBN import DBN
+from load_data import load_data
 
-degub_setting = 1
+DEBUG_SET = 1
 
 def test_DBN(finetune_lr=0.05, pretraining_epochs=20, pretrain_lr=0.01,
             k=1, training_epochs=1000, batch_size=10,DEBUG=0):
 
-    datasets = LF.load_cifar()
+    # datasets = LF.load_cifar()
+    # IMAGE_SIZE = 32
+    datasets = load_data(DEBUG=DEBUG)
+    IMAGE_SIZE = 28
 
     if DEBUG:
         N1 = 400
@@ -40,7 +44,7 @@ def test_DBN(finetune_lr=0.05, pretraining_epochs=20, pretrain_lr=0.01,
 
     print '... building the model'
     # construct the Deep Belief Network
-    dbn = DBN(n_ins=1024, hidden_layers_sizes=[500, 500],
+    dbn = DBN(n_ins=IMAGE_SIZE**2, hidden_layers_sizes=[500, 500],
               n_outs=10)
 
     #########################
@@ -163,4 +167,4 @@ def test_DBN(finetune_lr=0.05, pretraining_epochs=20, pretrain_lr=0.01,
                                               / 60.))
 
 if __name__ == '__main__':
-    test_DBN(DEBUG=degub_setting)
+    test_DBN(DEBUG=DEBUG_SET)
