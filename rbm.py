@@ -15,7 +15,6 @@ import numpy.random as numpy_rng
 import scipy.signal
 convolve = scipy.signal.convolve
 
-
 class RBM(object):
     def __init__(self, input=None, n_visible=1024, n_hidden=500, W=None,
         hbias=None, vbias=None, scale=0.01):
@@ -90,22 +89,20 @@ class RBM(object):
         return [pre_sigmoid_v1, v1_mean, v1_sample]
 
     def gibbs_hvh(self, h0_sample):
-        ''' This function implements one step of Gibbs sampling,
-            starting from the hidden state'''
+        # Gibbs sampling starting from the hidden state
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_h(h0_sample)
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_v(v1_sample)
         return [pre_sigmoid_v1, v1_mean, v1_sample,
                 pre_sigmoid_h1, h1_mean, h1_sample]
 
     def gibbs_vhv(self, v0_sample):
-        ''' This function implements one step of Gibbs sampling,
-            starting from the visible state'''
+        # Gibbs sampling starting from the visible state
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_v(v0_sample)
         pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_h(h1_sample)
         return [pre_sigmoid_h1, h1_mean, h1_sample,
                 pre_sigmoid_v1, v1_mean, v1_sample]
 
-    def cost_updates(self, lr=0.1, persistent=None, k=1):
+    def cost_updates(self, lr=0.05, persistent=None, k=1):
 
         pre_sigmoid_ph, ph_mean, ph_sample = self.sample_h_v(self.input)
         chain_start = ph_sample
@@ -125,7 +122,6 @@ class RBM(object):
             self.free_energy(chain_end))
         # We must not compute the gradient through the gibbs sampling
         gparams = T.grad(cost, self.params, consider_constant=[chain_end])
-        # end-snippet-3 start-snippet-4
         # constructs the update dictionary
         for gparam, param in zip(gparams, self.params):
             # make sure that the learning rate is of the right dtype
@@ -150,25 +146,11 @@ class RBM(object):
 
 # class CRBM(RBM):
 #     def __init__(self, input=None, filter_shape, num_filters, pool_shape, 
-#         binary=True, numpy_rng=None, theano_rng=None, scale=0.001):
+#         theano_rng=None, scale=0.001):
 
-
-#         # self.num_filters = num_filters
-#         # self.weights = scale * rng.randn(num_filters, *filter_shape)
-#         # self.vis_bias = scale * rng.randn()
-#         # self.hid_bias = 2 * scale * rng.randn(num_filters)
-
-#         # self._visible = binary and sigmoid or identity
-#         self._pool_shape = pool_shape
-
-
-#     ##########
 #         self.num_filters = num_filters
 #         self.n_visible = n_visible
 #         self.n_hidden = n_hidden
-
-#         if numpy_rng is None:
-#             numpy_rng = numpy.random
 
 #         if theano_rng is None:
 #             theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
@@ -193,7 +175,122 @@ class RBM(object):
 #         self.W = W
 #         self.hbias = hbias
 #         self.vbias = vbias
+#         self._pool_shape = pool_shape
 #         self.theano_rng = theano_rng
 #         self.params = [self.W, self.hbias, self.vbias]
 
+#     def _pool(self, hid):
+#         # updating the visible states
+#         _, r, c = hid.shape
+#         rows, cols = self._pool_shape
+#         active = T.exp(hid.T)
+#         pool = numpy.zeros(active.shape, dtype=theano.config.floatX)
+#         for j in range(int(numpy.ceil(float(c)/cols))):
+#             slice_j = slice(j*cols, (j+1)*cols)
+#             for i in range(int(numpy.ceil(float(r)/rows))):
+#                 mask = (slice_j, slice(i*row, (i+1)*rows))
+#                 pool[mask] = active[mask].sum(axis=0).sum(axis=0)
+#         return pool.T
 
+#     # def free_energy(self, v_sample):
+#     #     # computing free energy
+#     #     wx_b = T.dot(v_sample, self.W) + self.hbias
+#     #     vbias_term = T.dot(v_sample, self.vbias)
+#     #     hidden_term = T.sum(T.log(1 + T.exp(wx_b)), axis=1)
+#     #     return -hidden_term - vbias_term
+
+#     def pool_expect(self, vis):
+#         # updating the hidden states
+#         activation = T.exp(
+#             numpy.asarray(
+#                 [convolve(vis, self.W[k, ::-1, ::-1], 'valid')
+#                     for k in range(self.num_filters)]
+#                 ).T + self.hbias
+#             ).T
+#         return 1.-1./(1+self._pool(activation))
+
+#     def hid_expect(self, vis):
+#         # updating the hidden states
+#         activation = T.exp(
+#             numpy.asarray(
+#                 [convolve(vis, self.W[k, ::-1, ::-1], 'valid')
+#                     for k in range(self.num_filters)]
+#                 ).T + self.hbias
+#             ).T
+#         return activation/(1+self._pool(activation))
+
+#     def vis_expect(self, hid):
+#         # updating the hidden states
+#         activation = T.sum(
+#                 [convolve(hid[k], self.W[k], 'full')
+#                     for k in range(self.num_filters)]
+#                 ) + self.hbias
+#         return T.nnet.sigmoid(activation)
+
+
+#     def sample_h_v(self, v0_sample):
+#         # compute the activation of the hidden units given visibles samples
+#         h1, h1_expect = self.hid_expect(v0_sample)
+#         h1_sample = self.theano_rng.binomial(size=h1_expect.shape,
+#                                              n=1, p=h1_expect,
+#                                              dtype=theano.config.floatX)
+#         return [h1, h1_expect, h1_sample]
+
+
+#     def sample_v_h(self, h0_sample):
+#         # compute the activation of the visible given the hidden sample
+#         v1, v1_expect = self.vis_expect(h0_sample)
+#         # get a sample of the visible given their activation
+#         v1_sample = self.theano_rng.binomial(size=v1_expect.shape,
+#                                              n=1, p=v1_expect,
+#                                              dtype=theano.config.floatX)
+#         return [v1, v1_expect, v1_sample]
+
+#     def gibbs_hvh(self, h0_sample):
+#         # Gibbs sampling starting from the hidden state
+#         v1, v1_expect, v1_sample = self.sample_v_h(h0_sample)
+#         h1, h1_expect, h1_sample = self.sample_h_v(v1_sample)
+#         return [v1, v1_expect, v1_sample,
+#                 h1, h1_expect, h1_sample]
+
+#     def gibbs_vhv(self, v0_sample):
+#         # Gibbs sampling, starting from the visible state
+#         h1, h1_expect, h1_sample = self.sample_h_v(v0_sample)
+#         v1, v1_expect, v1_sample = self.sample_v_h(h1_sample)
+#         return [h1, h1_expect, h1_sample,
+#                 v1, v1_expect, v1_sample]
+
+#     def cost_updates(self, lr=0.1, k=1):
+
+#         _, _, ph_sample = self.sample_h_v(self.input)
+#         ([nvs, nv_means, nv_samples, 
+#           nhs, nh_means, nh_samples], updates) = theano.scan(
+#             self.gibbs_hvh,
+#             # the None are place holders, saying that chain_start
+#             # is the initial state corresponding to the 6th output
+#             outputs_info=[None, None, None, None, None, ph_sample],
+#             n_steps=k)
+
+#         cost = T.mean(self.free_energy(self.input)) - T.mean(
+#             self.free_energy(nv_samples[-1]))
+#         # We must not compute the gradient through the gibbs sampling
+#         gparams = T.grad(cost, self.params, consider_constant=[nv_samples[-1]])
+#         # constructs the update dictionary
+#         for gparam, param in zip(gparams, self.params):
+#             # make sure that the learning rate is of the right dtype
+#             updates[param] = param - gparam * T.cast(
+#                 lr,
+#                 dtype=theano.config.floatX
+#             )
+#         monitoring_cost = self.get_reconstruction_cost(updates, nvs[-1])
+
+#         return monitoring_cost, updates
+
+#     def get_reconstruction_cost(self, updates, nv):
+#         cross_entropy = T.mean(
+#             T.sum(
+#                 self.input*T.log(T.nnet.sigmoid(nv)) + (1-self.input)*T.log(1-T.nnet.sigmoid(nv)),
+#                 axis=1
+#             )
+#         )
+#         return cross_entropy

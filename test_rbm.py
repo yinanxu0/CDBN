@@ -12,30 +12,28 @@ import theano.tensor as T
 from utils import tile_raster_images
 import load_CIFAR as LF
 from rbm import RBM
-
-IMAGE_SIZE = 32
-IMAGE_SIZE_PLUS = IMAGE_SIZE+1
-DEBUG_SET = 0
 from load_data import load_data
 
-def test_rbm(learning_rate=0.1, training_epochs=10, batch_size=20,
-             n_chains=20, n_samples=10, output_folder='rbm_plots',
-             n_hidden=500):
+DEBUG_SET = 1
 
-    # datasets = load_data()
-    # IMAGE_SIZE = 28
+def test_rbm(learning_rate=0.05, training_epochs=15, batch_size=20,
+             output_folder='rbm', n_hidden=500):
+
+    datasets = load_data(DEBUG=DEBUG_SET)
+    IMAGE_SIZE = 28
+    IMAGE_SIZE_PLUS = IMAGE_SIZE+1
+
+    # if DEBUG_SET:
+    #     SIZE_TRAIN_SET=1
+    # else:
+    #     SIZE_TRAIN_SET=5
+    # IMAGE_SIZE = 32
     # IMAGE_SIZE_PLUS = IMAGE_SIZE+1
+    # datasets = LF.load_cifar(SIZE_TRAIN=SIZE_TRAIN_SET,DEBUG=DEBUG_SET)
 
-    if DEBUG_SET:
-        SIZE_TRAIN_SET=1
-    else:
-        SIZE_TRAIN_SET=5
-    datasets = LF.load_cifar(SIZE_TRAIN=SIZE_TRAIN_SET,DEBUG=DEBUG_SET)
-
-    train_set_x, train_set_y = datasets[0]
-    test_set_x, test_set_y = datasets[1]
-
-    n_train_batches = train_set_x.get_value().shape[0]/batch_size
+    train_set_x, _ = datasets[0]
+    number_samples = train_set_x.get_value().shape[0]
+    n_train_batches = number_samples/batch_size
 
     index = T.lscalar()    # index to a [mini]batch
     x = T.matrix('x')  # the data is presented as rasterized images
@@ -66,48 +64,43 @@ def test_rbm(learning_rate=0.1, training_epochs=10, batch_size=20,
 
     # go through training epochs
     for epoch in xrange(training_epochs):
-
-        # go through the training set
         mean_cost = [train_rbm(i) for i in xrange(n_train_batches)]
 
         print 'Training epoch %d, cost is %.2f.' % (epoch+1, numpy.mean(mean_cost))
 
-        # Plot filters after each training epoch
-        plotting_start = timeit.default_timer()
-        # Construct image from the weight matrix
+       # Construct image from the weight matrix
         image = Image.fromarray(
             tile_raster_images(
-                X=rbm.W.get_value(borrow=True).T,
+                X=rbm.W.get_value().T,
                 img_shape=(IMAGE_SIZE, IMAGE_SIZE),
                 tile_shape=(10, 10),
                 tile_spacing=(1, 1)
             )
         )
-        image.save('filters_at_epoch_%i.png' % epoch)
-        plotting_stop = timeit.default_timer()
-        plotting_time += (plotting_stop - plotting_start)
+        image.save('filters_epoch_%i.png' % (epoch+1))
 
     end_time = timeit.default_timer()
 
-    pretraining_time = (end_time - start_time) - plotting_time
+    training_time = (end_time - start_time)
 
-    print ('Training took %f minutes' % (pretraining_time/60.))
+    print ('Training took %f minutes' % (training_time/60.))
 
     #################################
     #     Sampling from the RBM     #
     #################################
-    # find out the number of test samples
-    number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
+    plot_every = 1000
+    n_chains=20
+    n_samples=10
 
-    # pick random test examples, with which to initialize the persistent chain
-    test_idx = numpy.random.randint(number_of_test_samples - n_chains)
+    # pick random train examples, with which to initialize the persistent chain
+    sample_idx = numpy.random.randint(number_samples, size=n_chains)
     vis_chain = theano.shared(
         numpy.asarray(
-            test_set_x.get_value(borrow=True)[test_idx:test_idx + n_chains],
+            train_set_x.get_value()[sample_idx],
             dtype=theano.config.floatX
         )
     )
-    plot_every = 1000
+
     # define one step of Gibbs sampling (mf = mean-field) define a
     # function that does `plot_every` steps before returning the
     # sample for plotting
@@ -130,8 +123,6 @@ def test_rbm(learning_rate=0.1, training_epochs=10, batch_size=20,
         name='sample_fn'
     )
 
-    # create a space to store the image for plotting ( we need to leave
-    # room for the tile_spacing as well)
     # n_samples=10, n_chains=20
     image_data = numpy.zeros(
         (IMAGE_SIZE_PLUS*n_samples+1, IMAGE_SIZE_PLUS*n_chains - 1),
